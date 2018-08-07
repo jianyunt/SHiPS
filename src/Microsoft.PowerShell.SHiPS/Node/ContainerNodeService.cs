@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Management.Automation;
+using System.Management.Automation.Provider;
+using CodeOwls.PowerShell.Paths;
 using CodeOwls.PowerShell.Provider.PathNodeProcessors;
 using CodeOwls.PowerShell.Provider.PathNodes;
 
@@ -14,7 +16,7 @@ namespace Microsoft.PowerShell.SHiPS
     /// <summary>
     /// Defines actions that applies to a ContainerNode.
     /// </summary>
-    internal class ContainerNodeService : PathNodeBase
+    internal class ContainerNodeService : PathNodeBase, ISetItemContent, IClearItemContent
     {
         private readonly SHiPSDrive _drive;
         private readonly SHiPSDirectory _container;
@@ -79,12 +81,14 @@ namespace Microsoft.PowerShell.SHiPS
         {
             var errors = new ConcurrentBag<ErrorRecord>();
 
+            var script = Constants.ScriptBlockWithNoParms.StringFormat(methodName);
+
             var parameters = PSScriptRunner.CallPowerShellScript(
                 node,
                 null,
                 _drive.PowerShellInstance,
                 null,
-                methodName,
+                script,
                 PSScriptRunner.output_DataAdded,
                 (sender, e) => PSScriptRunner.error_DataAdded(sender, e, errors));
 
@@ -150,7 +154,8 @@ namespace Microsoft.PowerShell.SHiPS
             }
             else
             {
-                var nodes = PSScriptRunner.InvokeScriptBlock(context, item, _drive)?.ToList();
+                var script = Constants.ScriptBlockWithNoParms.StringFormat(Constants.GetChildItem);
+                var nodes = PSScriptRunner.InvokeScriptBlock(context, item, _drive, script)?.ToList();
 
                 // Save the info of the node just visisted
                 SHiPSProvider.LastVisisted.Set(context.Path, this, nodes);
@@ -171,5 +176,44 @@ namespace Microsoft.PowerShell.SHiPS
                 }
             }
         }
+
+        #region ISetItemContent
+
+        public IContentWriter GetContentWriter(IProviderContext context)
+        {
+            var item = this.ContainerNode;
+            if (item == null)
+            {
+                return null;
+            }
+
+            var path = Path.GetTempFileName();
+            var stream = new ContentReaderWriter(path, FileMode.Create, FileAccess.Write, FileShare.Write, context, _drive, item);
+
+            return stream;
+        }
+
+        public object GetContentWriterDynamicParameters(IProviderContext context)
+        {
+            return null;
+        }
+
+        #endregion
+
+        #region IClearItemContent
+
+
+        public void ClearContent(IProviderContext providerContext)
+        {
+            // Define ClearContent for now as the PowerShell engine calls ClearContent first for Set-Content cmdlet.
+            return;
+        }
+
+        public object ClearContentDynamicParameters(IProviderContext providerContext)
+        {
+            return null;
+        }
+
+        #endregion
     }
 }

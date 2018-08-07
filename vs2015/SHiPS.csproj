@@ -69,6 +69,9 @@
     <Compile Include="..\src\Microsoft.PowerShell.SHiPS\SHiPSConstants.cs" />
     <Compile Include="..\src\Microsoft.PowerShell.SHiPS\Utility\ProgressTracker.cs" />
     <Compile Include="..\src\Microsoft.PowerShell.SHiPS\Utility\SHiPSExtensions.cs" />
+    <Compile Include="..\src\Microsoft.PowerShell.SHiPS\Node\ContentReaderWriter.cs">
+      <Link>ContentReaderWriter.cs</Link>
+    </Compile>
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="..\src\Microsoft.PowerShell.SHiPS\Resources\Resource.resx">

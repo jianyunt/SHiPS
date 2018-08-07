@@ -8,7 +8,8 @@
         internal static readonly string RootNodeTypeMustBeContainer = "RootNodeTypeMustBeContainer";
         internal static readonly string NodeNameIsNullOrEmpty = "NodeNameIsNullOrEmpty";
         internal static readonly string NewDriveRootDoesNotExist = "NewDriveRootDoesNotExist";
-        internal static readonly string NotContainerNode = "NotContainerNode";      
+        internal static readonly string NotContainerNode = "NotContainerNode";
+
     }
 
     internal static class Constants
@@ -16,6 +17,10 @@
         internal static readonly string Leaf = "Leaf";
         internal static readonly string GetChildItemDynamicParameters = "GetChildItemDynamicParameters";
         internal static readonly string GetChildItem = "GetChildItem";
+        internal static readonly string GetContent = "GetContent";
+        internal static readonly string SetContent = "SetContent";
+        internal static readonly string ScriptBlockWithNoParms = "[CmdletBinding()] param([object]$object) $object.{0}()";
+
 
         internal static string[] DefinedCommands = {
             "Set-Location",

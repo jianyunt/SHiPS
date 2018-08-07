@@ -23,11 +23,15 @@ namespace Microsoft.PowerShell.SHiPS
         /// <param name="context">A ProviderContext object contains information that a PowerShell provider needs.</param>
         /// <param name="node">ContainerNode object that is corresponding to the current path.</param>
         /// <param name="drive">Current drive that a user is in use.</param>
+        /// <param name="script">PowerShell script to be run.</param>
+        /// <param name="addNodeOnly">For the cached case, the node won't get freshed.</param>
         /// <returns></returns>
         internal static IEnumerable<IPathNode> InvokeScriptBlock(
             IProviderContext context,
             SHiPSDirectory node,
-            SHiPSDrive drive)
+            SHiPSDrive drive,
+            string script,
+            bool addNodeOnly = false)
         {           
             var progressId = 1;
             var activityId = Resource.RetrievingData;
@@ -41,7 +45,6 @@ namespace Microsoft.PowerShell.SHiPS
             try
             {
                 ICollection<object> results = new List<object>();
-                var methodToCall = Constants.GetChildItem;
 
                 var errors = new ConcurrentBag<ErrorRecord>();
                 var parameters = context.GetSHiPSParameters();
@@ -62,7 +65,7 @@ namespace Microsoft.PowerShell.SHiPS
                         context,
                         drive.PowerShellInstance,
                         parameters,
-                        methodToCall,
+                        script,
                         output_DataAdded,
                         (sender, e) => error_DataAdded(sender, e, errors));
 
@@ -119,7 +122,7 @@ namespace Microsoft.PowerShell.SHiPS
                     return Enumerable.Empty<IPathNode>();
                 }
 
-                return (node.UseCache && !usingDynamicParameter) ? ProcessResultsWithCache(results, context, node, drive) : ProcessResultsWithNoCache(results, context, node, drive);
+                return (node.UseCache && !usingDynamicParameter) ? ProcessResultsWithCache(results, context, node, drive, addNodeOnly) : ProcessResultsWithNoCache(results, context, node, drive);
             }
             finally
             {
@@ -143,7 +146,8 @@ namespace Microsoft.PowerShell.SHiPS
             ICollection<object> results,
             IProviderContext context,
             SHiPSDirectory node,
-            SHiPSDrive drive)
+            SHiPSDrive drive,
+            bool addNodeOnly)
         {
             //TODO: async vs cache
             //we could yield result right away but we need to save the all children in the meantime because 
@@ -152,8 +156,11 @@ namespace Microsoft.PowerShell.SHiPS
 
             List<IPathNode> retval = new List<IPathNode>();
 
-            //clear the child node list, get ready to get the refreshed ones
-            node.Children?.Clear();
+            if (!addNodeOnly)
+            {
+                //clear the child node list, get ready to get the refreshed ones
+                node.Children?.Clear();
+            }
 
             foreach (var result in results.WhereNotNull())
             {
@@ -162,7 +169,7 @@ namespace Microsoft.PowerShell.SHiPS
                 {
                     return null;
                 }
-                node.AddAsChildNode(result, drive, retval);
+                node.AddAsChildNode(result, drive, addNodeOnly, retval);
             }
 
             // Mark the node visited once we sucessfully fetched data.
@@ -185,7 +192,7 @@ namespace Microsoft.PowerShell.SHiPS
                     yield break;
                 }
 
-                var cnode = node.GetChildPNode(result, drive, cache:false);
+                var cnode = node.GetChildPNode(result, drive, false, cache:false);
                 if (cnode != null)
                 {
                     yield return cnode;
@@ -232,11 +239,11 @@ namespace Microsoft.PowerShell.SHiPS
         }
 
         internal static ICollection<object> CallPowerShellScript(
-            SHiPSDirectory node,
+            SHiPSBase node,
             IProviderContext context,
             System.Management.Automation.PowerShell powerShell,
             SHiPSParameters parameters,
-            string methodName,            
+            string script,
             EventHandler<DataAddedEventArgs> outputAction,
             EventHandler<DataAddedEventArgs> errorAction)
         {
@@ -270,7 +277,7 @@ namespace Microsoft.PowerShell.SHiPS
                 //output = node.GetChildItem();
 
                 //make script block             
-                powerShell.AddScript("[CmdletBinding()] param([object]$object)  $object.{0}()".StringFormat(methodName));
+                powerShell.AddScript(script);
                 powerShell.AddParameter("object", node);
                 
                 
@@ -295,7 +302,6 @@ namespace Microsoft.PowerShell.SHiPS
                 powerShell.Streams.Error.DataAdded -= errorAction;
             }
         }
-
 
         internal static void error_DataAdded(object sender, DataAddedEventArgs e, ConcurrentBag<ErrorRecord> errors)
         {
