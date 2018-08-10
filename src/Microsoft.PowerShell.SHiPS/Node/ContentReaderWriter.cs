@@ -1,12 +1,20 @@
 ﻿using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Management.Automation.Provider;
 using System.Management.Automation;
+using CodeOwls.PowerShell.Provider;
 using CodeOwls.PowerShell.Provider.PathNodeProcessors;
 
 namespace Microsoft.PowerShell.SHiPS
 {
+    internal enum AccessMode
+    {
+        Set = 1,
+        Get = 2
+    }
 
     /// <summary>
     /// The content stream class for the SHiPS provider. It implements both
@@ -14,7 +22,7 @@ namespace Microsoft.PowerShell.SHiPS
     /// </summary>
     internal class ContentReaderWriter : IContentReader, IContentWriter
     {
-        private readonly string _path;
+        private readonly string _tempFilePath;
         private readonly CmdletProvider _provider;
         private FileStream _stream;
         private StreamReader _reader;
@@ -22,30 +30,25 @@ namespace Microsoft.PowerShell.SHiPS
         private readonly SHiPSBase _node;
         private readonly SHiPSDrive _drive;
         private readonly IProviderContext _context;
+        private readonly AccessMode _mode;
 
         /// <summary>
         /// Constructor for the content stream.
         /// </summary>
-        /// <param name="path">The path to the file to get the content from.</param>
         /// <param name="mode">The file mode to open the file with.</param>
-        /// <param name="access">The file access requested in the file.</param>
-        /// <param name="share">The file share to open the file with.</param>
+        /// <param name="objects">The file access requested in the file.</param>
         /// <param name="context"></param>
         /// <param name="drive"></param>
         /// <param name="node"></param>
-        public ContentReaderWriter(string path, FileMode mode, FileAccess access, FileShare share, IProviderContext context, SHiPSDrive drive, SHiPSBase node)   
+        public ContentReaderWriter(ICollection<object> objects,  AccessMode mode, IProviderContext context, SHiPSDrive drive, SHiPSBase node)
         {
-            if (string.IsNullOrEmpty(path))
-            {
-                throw new ArgumentNullException("path");
-            }
-
-            _path = path;
             _provider = context.CmdletProvider;
             _drive = drive;
             _node = node;
             _context = context;
-            CreateStreams(path, mode, access, share);
+            _tempFilePath = Path.GetTempFileName();
+            CreateStreams(objects, mode);
+            _mode = mode;
         }
 
         /// <summary>
@@ -91,7 +94,7 @@ namespace Microsoft.PowerShell.SHiPS
                     (e is UnauthorizedAccessException))
                 {
                     //Exception contains specific message about the error occured and so no need for errordetails.
-                    _provider.WriteError(new ErrorRecord(e, "GetContentReaderIOError", ErrorCategory.ReadError, _path));
+                    _provider.WriteError(new ErrorRecord(e, "GetContentReaderIOError", ErrorCategory.ReadError, _tempFilePath));
                     return null;
                 }
 
@@ -100,7 +103,7 @@ namespace Microsoft.PowerShell.SHiPS
 
             return blocks.ToArray();
         }
-  
+
         private bool ReadByLine(ArrayList blocks)
         {
             // Reading lines as strings
@@ -115,24 +118,33 @@ namespace Microsoft.PowerShell.SHiPS
             return peekResult != -1;
         }
 
-        private void CreateStreams(string filePath, FileMode fileMode, FileAccess fileAccess, FileShare fileShare)
+        private void CreateStreams(ICollection<object> objects, AccessMode accessMode)
         {
-            _stream = new FileStream(filePath, fileMode, fileAccess, fileShare);
+            _stream = new FileStream(_tempFilePath, FileMode.Create, FileAccess.ReadWrite, FileShare.ReadWrite);
+            if (accessMode == AccessMode.Get && objects != null && objects.Any())
+            {
+                _writer = new StreamWriter(_stream);
+                foreach (var obj in objects)
+                {
+                    _writer.WriteLine(obj.ToArgString());
+                }
+                _writer.Flush();
+
+            }
+
+            // Set to beginning of the stream.
+            _stream.Seek(0, SeekOrigin.Begin);
 
             // Open the reader stream
-            if ((fileAccess & (FileAccess.Read)) != 0)
+            if (accessMode == AccessMode.Get)
             {
                 _reader = new StreamReader(_stream);
             }
-
-            // Open the writer stream
-            if ((fileAccess & (FileAccess.Write)) != 0)
+            else
             {
-                // Set to beginning of the stream.
-                _stream.Seek(0, SeekOrigin.Begin);
                 _writer = new StreamWriter(_stream);
-            }    
-        }    
+            }
+        }
 
         /// <summary>
         /// Moves the current stream position in the file
@@ -145,7 +157,7 @@ namespace Microsoft.PowerShell.SHiPS
             _writer?.Flush();
             _stream.Seek(offset, origin);
             _writer?.Flush();
-            _reader?.DiscardBufferedData();  
+            _reader?.DiscardBufferedData();
         }
 
         /// <summary>
@@ -154,7 +166,6 @@ namespace Microsoft.PowerShell.SHiPS
         public void Close()
         {
             var streamClosed = false;
-            var setcontent = _stream.CanWrite;
             if (_writer != null)
             {
                 try
@@ -182,16 +193,16 @@ namespace Microsoft.PowerShell.SHiPS
 
             // Calling the PowerShell module
 
-            if (setcontent)
+            if (AccessMode.Set == _mode)
             {
-                var script = Constants.ScriptBlockWithParams3.StringFormat(Constants.SetContent, _path, _context.Path);
+                var script = Constants.ScriptBlockWithParams3.StringFormat(Constants.SetContent, _tempFilePath, _context.Path);
 
                 // Invoke the SetContent and update cached item if applicable
-                PSScriptRunner.InvokeScriptBlockAndBuildTree(_context, _node as SHiPSDirectory, _drive, script, addNodeOnly:true);
+                PSScriptRunner.InvokeScriptBlockAndBuildTree(_context, _node as SHiPSDirectory, _drive, script, addNodeOnly: true);
             }
 
             //clean up
-            File.Delete(_path);
+            File.Delete(_tempFilePath);
         }
 
         /// <summary>
@@ -225,7 +236,7 @@ namespace Microsoft.PowerShell.SHiPS
             {
                 _writer.WriteLine(content.ToString());
             }
-        } 
+        }
 
         /// <summary>
         /// Closes the file stream
@@ -238,7 +249,7 @@ namespace Microsoft.PowerShell.SHiPS
 
         internal void Dispose(bool isDisposing)
         {
-            if (!isDisposing) { return;}
+            if (!isDisposing) { return; }
 
             _stream?.Dispose();
             _reader?.Dispose();

@@ -1,5 +1,4 @@
 ﻿using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Management.Automation.Provider;
 using CodeOwls.PowerShell.Paths;
@@ -165,9 +164,7 @@ namespace Microsoft.PowerShell.SHiPS
                 return null;
             }
 
-            var path = Path.GetTempFileName();
-            var stream = new ContentReaderWriter(path, FileMode.Create, FileAccess.Write, FileShare.Write, context, _drive, item);
-
+            var stream = new ContentReaderWriter(null, AccessMode.Set, context, _drive, item);
             return stream;
         }
 

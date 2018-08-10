@@ -42,21 +42,13 @@ namespace Microsoft.PowerShell.SHiPS
 
         public IContentReader GetContentReader(IProviderContext context)
         {
+            // Calling GetContent()
             var script = Constants.ScriptBlockWithParam1.StringFormat(Constants.GetContent);
             var results = PSScriptRunner.InvokeScriptBlock(_shipsLeaf, _drive, script);
 
-            var file = results?.FirstOrDefault();
-            if (file != null)
-            {
-                var path = file.ToString();
-                if (File.Exists(path))
-                {
-                    var stream = new ContentReaderWriter(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, context, _drive, _shipsLeaf);
-                    return stream;
-                }
-            }
-
-            return null;
+            // Expected a collection of strings returned from GetContent() and save it to a stream
+            var stream = new ContentReaderWriter(results, AccessMode.Get, context, _drive, _shipsLeaf);
+            return stream;
         }
 
         public object GetContentReaderDynamicParameters(IProviderContext context)
