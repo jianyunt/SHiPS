@@ -26,7 +26,7 @@ namespace Microsoft.PowerShell.SHiPS
         /// <param name="script">PowerShell script to be run.</param>
         /// <param name="addNodeOnly">For the cached case, the node won't get freshed.</param>
         /// <returns></returns>
-        internal static IEnumerable<IPathNode> InvokeScriptBlock(
+        internal static IEnumerable<IPathNode> InvokeScriptBlockAndBuildTree(
             IProviderContext context,
             SHiPSDirectory node,
             SHiPSDrive drive,
@@ -62,7 +62,6 @@ namespace Microsoft.PowerShell.SHiPS
                 {
                     results = CallPowerShellScript(
                         node,
-                        context,
                         drive.PowerShellInstance,
                         parameters,
                         script,
@@ -140,6 +139,35 @@ namespace Microsoft.PowerShell.SHiPS
                 //stop the running script
                 drive.PowerShellInstance.Stop();
             }
+        }
+
+        internal static ICollection<object> InvokeScriptBlock(
+            SHiPSBase node,
+            SHiPSDrive drive,
+            string script)
+        {
+
+            var errors = new ConcurrentBag<ErrorRecord>();
+
+            var results = CallPowerShellScript(
+                node,                
+                drive.PowerShellInstance,
+                null,
+                script,
+                output_DataAdded,
+                (sender, e) => error_DataAdded(sender, e, errors));
+
+            if (errors.WhereNotNull().Any())
+            {
+                var error = errors.FirstOrDefault();
+                if (error == null) { return null; }
+
+                var message = Environment.NewLine;
+                message += error.ErrorDetails == null ? error.Exception.Message : error.ErrorDetails.Message;
+                drive.SHiPS.WriteWarning(message);
+            }
+
+            return results;
         }
 
         private static IEnumerable<IPathNode> ProcessResultsWithCache(
@@ -240,7 +268,6 @@ namespace Microsoft.PowerShell.SHiPS
 
         internal static ICollection<object> CallPowerShellScript(
             SHiPSBase node,
-            IProviderContext context,
             System.Management.Automation.PowerShell powerShell,
             SHiPSParameters parameters,
             string script,

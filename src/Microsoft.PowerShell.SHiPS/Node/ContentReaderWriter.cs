@@ -184,11 +184,14 @@ namespace Microsoft.PowerShell.SHiPS
 
             if (setcontent)
             {
-                var script="[CmdletBinding()] param([object]$object)  $object.{0}('{1}', '{2}')".StringFormat(Constants.SetContent, _path, _context.Path);
+                var script = Constants.ScriptBlockWithParams3.StringFormat(Constants.SetContent, _path, _context.Path);
 
                 // Invoke the SetContent and update cached item if applicable
-                PSScriptRunner.InvokeScriptBlock(_context, _node as SHiPSDirectory, _drive, script, addNodeOnly:true);
+                PSScriptRunner.InvokeScriptBlockAndBuildTree(_context, _node as SHiPSDirectory, _drive, script, addNodeOnly:true);
             }
+
+            //clean up
+            File.Delete(_path);
         }
 
         /// <summary>

@@ -1,9 +1,6 @@
-﻿using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Management.Automation;
 using System.Management.Automation.Provider;
 using CodeOwls.PowerShell.Paths;
 using CodeOwls.PowerShell.Provider.PathNodeProcessors;
@@ -72,35 +69,16 @@ namespace Microsoft.PowerShell.SHiPS
                 }
 
                 // Geting dynamic parameters
-                var parameters = GetNodeChildrenDynamicParameters(Constants.GetChildItemDynamicParameters, item);
+                var parameters = GetNodeChildrenDynamicParameters(item);
                 return parameters;
             }
         }
 
-        private  object GetNodeChildrenDynamicParameters(string methodName, SHiPSDirectory node)
+        private  object GetNodeChildrenDynamicParameters(SHiPSDirectory node)
         {
-            var errors = new ConcurrentBag<ErrorRecord>();
-
-            var script = Constants.ScriptBlockWithNoParms.StringFormat(methodName);
-
-            var parameters = PSScriptRunner.CallPowerShellScript(
-                node,
-                null,
-                _drive.PowerShellInstance,
-                null,
-                script,
-                PSScriptRunner.output_DataAdded,
-                (sender, e) => PSScriptRunner.error_DataAdded(sender, e, errors));
-
-            if (errors.WhereNotNull().Any())
-            {
-                var error = errors.FirstOrDefault();
-                var message = Environment.NewLine;
-                message += error.ErrorDetails == null ? error.Exception.Message : error.ErrorDetails.Message;
-                throw new InvalidDataException(message);
-            }
-
-            return parameters != null ? parameters.FirstOrDefault() : null;   
+            var script = Constants.ScriptBlockWithParam1.StringFormat(Constants.GetChildItemDynamicParameters);
+            var parameters = PSScriptRunner.InvokeScriptBlock(node, _drive, script);
+            return parameters?.FirstOrDefault();   
         }
 
         /// <summary>
@@ -154,8 +132,8 @@ namespace Microsoft.PowerShell.SHiPS
             }
             else
             {
-                var script = Constants.ScriptBlockWithNoParms.StringFormat(Constants.GetChildItem);
-                var nodes = PSScriptRunner.InvokeScriptBlock(context, item, _drive, script)?.ToList();
+                var script = Constants.ScriptBlockWithParam1.StringFormat(Constants.GetChildItem);
+                var nodes = PSScriptRunner.InvokeScriptBlockAndBuildTree(context, item, _drive, script)?.ToList();
 
                 // Save the info of the node just visisted
                 SHiPSProvider.LastVisisted.Set(context.Path, this, nodes);

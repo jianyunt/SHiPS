@@ -16,10 +16,14 @@
     {
         internal static readonly string Leaf = "Leaf";
         internal static readonly string GetChildItemDynamicParameters = "GetChildItemDynamicParameters";
+        internal static readonly string InvokeItemDynamicParameters = "InvokeItemDynamicParameters";
         internal static readonly string GetChildItem = "GetChildItem";
         internal static readonly string GetContent = "GetContent";
         internal static readonly string SetContent = "SetContent";
-        internal static readonly string ScriptBlockWithNoParms = "[CmdletBinding()] param([object]$object) $object.{0}()";
+        internal static readonly string InvokeItem = "InvokeItem";
+        internal static readonly string ScriptBlockWithParam1 = "[CmdletBinding()] param([object]$object) $object.{0}()";
+        internal static readonly string ScriptBlockWithParams2   = "[CmdletBinding()] param([object]$object) $object.{0}('{1}')";
+        internal static readonly string ScriptBlockWithParams3  = "[CmdletBinding()] param([object]$object) $object.{0}('{1}', '{2}')";
 
 
         internal static string[] DefinedCommands = {
@@ -31,9 +35,10 @@
             "Resolve-Path",
             "Get-Item",
             "Test-Path",
-            // Below are NotSupported commands, but we do handle their error messages.
+            "Invoke-Item",
             "Get-Content",
             "Set-Content",
+             // Below are NotSupported commands, but we do handle their error messages.
             "Clear-Content",
             "Move-Item",
             "Copy-Item",

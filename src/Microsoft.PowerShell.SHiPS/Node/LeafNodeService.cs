@@ -1,8 +1,6 @@
-﻿using System;
-using System.Collections.Concurrent;
+﻿using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Management.Automation;
 using System.Management.Automation.Provider;
 using CodeOwls.PowerShell.Paths;
 using CodeOwls.PowerShell.Provider.PathNodeProcessors;
@@ -13,7 +11,7 @@ namespace Microsoft.PowerShell.SHiPS
     /// <summary>
     /// Defines actions that applies to a SHiPSLeaf node.
     /// </summary>
-    internal class LeafNodeService : PathNodeBase, IGetItemContent, IClearItemContent
+    internal class LeafNodeService : PathNodeBase, IGetItemContent, IClearItemContent, IInvokeItem
     {
         private readonly SHiPSLeaf _shipsLeaf;
         private static readonly string _leaf = ".";
@@ -44,30 +42,8 @@ namespace Microsoft.PowerShell.SHiPS
 
         public IContentReader GetContentReader(IProviderContext context)
         {
-            var errors = new ConcurrentBag<ErrorRecord>();
-
-            var script = "[CmdletBinding()] param([object]$object)  $object.{0}()".StringFormat(Constants.GetContent);
-
-            var results = PSScriptRunner.CallPowerShellScript(
-             _shipsLeaf,
-             context,
-             _drive.PowerShellInstance,
-             null,
-             script,
-             PSScriptRunner.output_DataAdded,
-             (sender, e) => PSScriptRunner.error_DataAdded(sender, e, errors));
-
-
-            if (errors.WhereNotNull().Any())
-            {
-                var error = errors.FirstOrDefault();
-                if (error != null)
-                {
-                    var message = Environment.NewLine;
-                    message += error.ErrorDetails == null ? error.Exception.Message : error.ErrorDetails.Message;
-                    _drive.SHiPS.WriteWarning(message);
-                }
-            }
+            var script = Constants.ScriptBlockWithParam1.StringFormat(Constants.GetContent);
+            var results = PSScriptRunner.InvokeScriptBlock(_shipsLeaf, _drive, script);
 
             var file = results?.FirstOrDefault();
             if (file != null)
@@ -104,5 +80,26 @@ namespace Microsoft.PowerShell.SHiPS
         }
 
         #endregion
+
+        public object InvokeItemParameters
+        {
+            get
+            {
+                var script = Constants.ScriptBlockWithParam1.StringFormat(Constants.InvokeItemDynamicParameters);
+                var parameters = PSScriptRunner.InvokeScriptBlock(_shipsLeaf, _drive, script);
+                return parameters?.FirstOrDefault(); ;
+            } 
+        }
+        public IEnumerable<object> InvokeItem(IProviderContext context, string path)
+        {
+            // Set the DynamicParameters before calling InvokeItem method written in PS script
+            _shipsLeaf.SHiPSProviderContext.DynamicParameters = context.DynamicParameters;
+
+            // Calling SHiPS based PowerShell provider 'void InvokeItem([string]$path)'
+            var script = Constants.ScriptBlockWithParams2.StringFormat(Constants.InvokeItem, path);
+            PSScriptRunner.InvokeScriptBlock(_shipsLeaf, _drive, script);
+
+            return null;
+        }
     }
 }

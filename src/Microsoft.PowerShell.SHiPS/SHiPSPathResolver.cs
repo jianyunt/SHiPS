@@ -179,8 +179,8 @@ namespace Microsoft.PowerShell.SHiPS
                 }
             }
 
-            var script = Constants.ScriptBlockWithNoParms.StringFormat(Constants.GetChildItem);
-            var children = PSScriptRunner.InvokeScriptBlock(context, parentNode, _drive, script)?.ToList();
+            var script = Constants.ScriptBlockWithParam1.StringFormat(Constants.GetChildItem);
+            var children = PSScriptRunner.InvokeScriptBlockAndBuildTree(context, parentNode, _drive, script)?.ToList();
             if (children == null) { return null;}
 
             foreach (var node in children)
