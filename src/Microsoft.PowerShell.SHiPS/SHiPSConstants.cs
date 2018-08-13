@@ -9,6 +9,7 @@
         internal static readonly string NodeNameIsNullOrEmpty = "NodeNameIsNullOrEmpty";
         internal static readonly string NewDriveRootDoesNotExist = "NewDriveRootDoesNotExist";
         internal static readonly string NotContainerNode = "NotContainerNode";
+        internal static readonly string SetContentNotSupportedErrorId = "SetContent.NotSupported";
 
     }
 

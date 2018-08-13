@@ -132,7 +132,7 @@ namespace Microsoft.PowerShell.SHiPS
             else
             {
                 var script = Constants.ScriptBlockWithParam1.StringFormat(Constants.GetChildItem);
-                var nodes = PSScriptRunner.InvokeScriptBlockAndBuildTree(context, item, _drive, script)?.ToList();
+                var nodes = PSScriptRunner.InvokeScriptBlockAndBuildTree(context, item, _drive, script, PSScriptRunner.ReportErrors)?.ToList();
 
                 // Save the info of the node just visisted
                 SHiPSProvider.LastVisisted.Set(context.Path, this, nodes);

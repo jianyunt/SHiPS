@@ -198,7 +198,7 @@ namespace Microsoft.PowerShell.SHiPS
                 var script = Constants.ScriptBlockWithParams3.StringFormat(Constants.SetContent, _tempFilePath, _context.Path);
 
                 // Invoke the SetContent and update cached item if applicable
-                PSScriptRunner.InvokeScriptBlockAndBuildTree(_context, _node as SHiPSDirectory, _drive, script, addNodeOnly: true);
+                PSScriptRunner.InvokeScriptBlockAndBuildTree(_context, _node as SHiPSDirectory, _drive, script, PSScriptRunner.SetContentNotSupported, addNodeOnly: true);
             }
 
             //clean up

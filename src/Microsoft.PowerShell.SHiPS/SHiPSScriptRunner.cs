@@ -5,6 +5,7 @@ using System.Collections.Concurrent;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using CodeOwls.PowerShell.Paths.Exceptions;
 using CodeOwls.PowerShell.Provider.PathNodeProcessors;
 using CodeOwls.PowerShell.Provider.PathNodes;
 using Microsoft.PowerShell.SHiPS.Resources;
@@ -24,13 +25,15 @@ namespace Microsoft.PowerShell.SHiPS
         /// <param name="node">ContainerNode object that is corresponding to the current path.</param>
         /// <param name="drive">Current drive that a user is in use.</param>
         /// <param name="script">PowerShell script to be run.</param>
-        /// <param name="addNodeOnly">For the cached case, the node won't get freshed.</param>
+        /// <param name="errorHandler">Action for handling error cases.</param>
+        /// <param name="addNodeOnly">Add a new node object to the internal cache.</param>
         /// <returns></returns>
         internal static IEnumerable<IPathNode> InvokeScriptBlockAndBuildTree(
             IProviderContext context,
             SHiPSDirectory node,
             SHiPSDrive drive,
             string script,
+            Action<string, IProviderContext, IEnumerable<ErrorRecord>> errorHandler,
             bool addNodeOnly = false)
         {           
             var progressId = 1;
@@ -99,7 +102,7 @@ namespace Microsoft.PowerShell.SHiPS
                     }
 
                     // report the error if there are any
-                    ReportErrors(node.Name, context, errors);
+                    errorHandler?.Invoke(node.Name, context, errors);
                     //do not yield break here as we need to display the rest of outputs
                 }
 
@@ -368,11 +371,30 @@ namespace Microsoft.PowerShell.SHiPS
             }
         }
 
-        private static void ReportErrors(string item, IProviderContext context, IEnumerable<ErrorRecord> errors)
+        internal static void ReportErrors(string item, IProviderContext context, IEnumerable<ErrorRecord> errors)
         {
             foreach (var error in errors)
             {
                 var msg = Resource.MaybeItemNotExist.StringFormat(item, error.ErrorDetails == null ? error.Exception.Message : error.ErrorDetails.Message);
+                context.ReportError(error.FullyQualifiedErrorId, msg, error.CategoryInfo.Category, "SHiPS");
+
+                if (!string.IsNullOrWhiteSpace(error.Exception.StackTrace))
+                {
+                    // give a debug hint if we have a script stack trace for more info
+                    context.WriteDebug(error.Exception.StackTrace);
+                }
+            }
+        }
+
+        internal static void SetContentNotSupported(string item, IProviderContext context, IEnumerable<ErrorRecord> errors)
+        {
+            var exception = new NodeDoesNotSupportCmdletException(context.Path, Constants.SetContent);
+            var errorRecord = new ErrorRecord(exception, ErrorId.SetContentNotSupportedErrorId, ErrorCategory.NotImplemented, context.Path);
+            context.WriteError(errorRecord);
+
+            foreach (var error in errors)
+            {
+                var msg = error.ErrorDetails == null ? error.Exception.Message : error.ErrorDetails.Message;
                 context.ReportError(error.FullyQualifiedErrorId, msg, error.CategoryInfo.Category, "SHiPS");
 
                 if (!string.IsNullOrWhiteSpace(error.Exception.StackTrace))
