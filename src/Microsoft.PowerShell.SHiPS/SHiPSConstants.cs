@@ -21,10 +21,9 @@
         internal static readonly string GetChildItem = "GetChildItem";
         internal static readonly string GetContent = "GetContent";
         internal static readonly string SetContent = "SetContent";
-        internal static readonly string InvokeItem = "InvokeItem";
-        internal static readonly string ScriptBlockWithParam1 = "[CmdletBinding()] param([object]$object) $object.{0}()";
-        internal static readonly string ScriptBlockWithParams2   = "[CmdletBinding()] param([object]$object) $object.{0}('{1}')";
-        internal static readonly string ScriptBlockWithParams3  = "[CmdletBinding()] param([object]$object) $object.{0}('{1}', '{2}')";
+        internal static readonly string ScriptBlockWithParam1  = "[CmdletBinding()] param([object]$object) $object.{0}()";
+        internal static readonly string ScriptBlockWithParam2 = "[CmdletBinding()] param([object]$object, [string]$p0) $object.{0}($p0)";
+        internal static readonly string ScriptBlockWithParam3 = "[CmdletBinding()] param([object]$object, [string]$p0, [string]$p1) $object.{0}($p0, $p1)";
 
 
         internal static string[] DefinedCommands = {
@@ -36,7 +35,6 @@
             "Resolve-Path",
             "Get-Item",
             "Test-Path",
-            "Invoke-Item",
             "Get-Content",
             "Set-Content",
              // Below are NotSupported commands, but we do handle their error messages.
@@ -47,7 +45,8 @@
             "Remove-Item",
             "Rename-Item",
             "Clear-Item",
-            "Set-Item"
+            "Set-Item",
+            "Invoke-Item"
         };
     }
 }

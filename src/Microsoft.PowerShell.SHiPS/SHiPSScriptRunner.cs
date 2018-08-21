@@ -19,14 +19,14 @@ namespace Microsoft.PowerShell.SHiPS
     internal class PSScriptRunner
     {
         /// <summary>
-        /// Invokes a PowerShell script block.
+        /// Invokes a PowerShell script block; Removes the existing child node list before adding new ones.
         /// </summary>
         /// <param name="context">A ProviderContext object contains information that a PowerShell provider needs.</param>
         /// <param name="node">ContainerNode object that is corresponding to the current path.</param>
         /// <param name="drive">Current drive that a user is in use.</param>
         /// <param name="script">PowerShell script to be run.</param>
         /// <param name="errorHandler">Action for handling error cases.</param>
-        /// <param name="addNodeOnly">Add a new node object to the internal cache.</param>
+        /// <param name="args">Arguments passed into the script block.</param>
         /// <returns></returns>
         internal static IEnumerable<IPathNode> InvokeScriptBlockAndBuildTree(
             IProviderContext context,
@@ -34,7 +34,7 @@ namespace Microsoft.PowerShell.SHiPS
             SHiPSDrive drive,
             string script,
             Action<string, IProviderContext, IEnumerable<ErrorRecord>> errorHandler,
-            bool addNodeOnly = false)
+            params string[] args)
         {           
             var progressId = 1;
             var activityId = Resource.RetrievingData;
@@ -69,7 +69,8 @@ namespace Microsoft.PowerShell.SHiPS
                         parameters,
                         script,
                         output_DataAdded,
-                        (sender, e) => error_DataAdded(sender, e, errors));
+                        (sender, e) => error_DataAdded(sender, e, errors),
+                        args);
 
                 }, cts.Token);
 
@@ -124,7 +125,8 @@ namespace Microsoft.PowerShell.SHiPS
                     return Enumerable.Empty<IPathNode>();
                 }
 
-                return (node.UseCache && !usingDynamicParameter) ? ProcessResultsWithCache(results, context, node, drive, addNodeOnly) : ProcessResultsWithNoCache(results, context, node, drive);
+                // Add the node list to the cache if needed
+                return (node.UseCache && !usingDynamicParameter) ? ProcessResultsWithCache(results, context, node, drive, addNodeOnly: false) : ProcessResultsWithNoCache(results, context, node, drive);
             }
             finally
             {
@@ -144,33 +146,99 @@ namespace Microsoft.PowerShell.SHiPS
             }
         }
 
+        /// <summary>
+        /// Invokes an script block and return a collection of the objects.
+        /// </summary>
+        /// <param name="node"></param>
+        /// <param name="drive"></param>
+        /// <param name="script"></param>
+        /// <returns></returns>
         internal static ICollection<object> InvokeScriptBlock(
             SHiPSBase node,
             SHiPSDrive drive,
             string script)
         {
+            return InvokeScriptBlock(null, node, drive, script);
+        }
 
-            var errors = new ConcurrentBag<ErrorRecord>();
-
-            var results = CallPowerShellScript(
-                node,                
-                drive.PowerShellInstance,
-                null,
-                script,
-                output_DataAdded,
-                (sender, e) => error_DataAdded(sender, e, errors));
-
-            if (errors.WhereNotNull().Any())
+        /// <summary>
+        /// Invokes an script block and return a collection of the objects.
+        /// </summary>
+        /// <param name="node"></param>
+        /// <param name="drive"></param>
+        /// <param name="script"></param>
+        /// <param name="args">Arguments passed into the script block.</param>
+        /// <returns></returns>
+        internal static ICollection<object> InvokeScriptBlock(
+            SHiPSBase node,
+            SHiPSDrive drive,
+            string script,
+            params string[] args)
+        {
+            return InvokeScriptBlock(null, node, drive, script, args);
+        }
+        /// <summary>
+        /// Invokes a script block and updates the parent's children node list in the cached case.
+        /// </summary>
+        /// <param name="context">A ProviderContext object contains information that a PowerShell provider needs.</param>
+        /// <param name="node">Node object that is corresponding to the current path.</param>
+        /// <param name="drive">Current drive that a user is in use.</param>
+        /// <param name="script">PowerShell script to be run.</param>
+        /// <param name="args">Arguments passed into the script block.</param>
+        /// <returns></returns>
+        internal static ICollection<object> InvokeScriptBlock(
+           IProviderContext context,
+           SHiPSBase node,
+           SHiPSDrive drive,
+           string script,
+           params string[] args)
+        {
+            try
             {
-                var error = errors.FirstOrDefault();
-                if (error == null) { return null; }
+                var errors = new ConcurrentBag<ErrorRecord>();
 
-                var message = Environment.NewLine;
-                message += error.ErrorDetails == null ? error.Exception.Message : error.ErrorDetails.Message;
-                drive.SHiPS.WriteWarning(message);
+                var results = CallPowerShellScript(
+                    node,
+                    drive.PowerShellInstance,
+                    null,
+                    script,
+                    output_DataAdded,
+                    (sender, e) => error_DataAdded(sender, e, errors),
+                    args);
+
+                if (errors.WhereNotNull().Any())
+                {
+                    var error = errors.FirstOrDefault();
+                    if (error == null) { return null; }
+
+                    var message = Environment.NewLine;
+                    message += error.ErrorDetails == null ? error.Exception.Message : error.ErrorDetails.Message;
+                    drive.SHiPS.WriteWarning(message);
+                }
+
+                if (results == null || !results.Any())
+                {
+                    return null;
+                }
+
+                if(context!= null && node.UseCache)
+                {
+                    if (node.IsLeaf)
+                    {
+                        ProcessResultsWithCache(results, context, node.Parent, drive, addNodeOnly: true);
+                    }
+                    else
+                    {
+                        ProcessResultsWithCache(results, context, node as SHiPSDirectory, drive, addNodeOnly: true);
+                    }
+                }
+                return results;
             }
-
-            return results;
+            finally
+            {
+                //stop the running script
+                drive.PowerShellInstance.Stop();
+            }
         }
 
         private static IEnumerable<IPathNode> ProcessResultsWithCache(
@@ -187,6 +255,7 @@ namespace Microsoft.PowerShell.SHiPS
 
             List<IPathNode> retval = new List<IPathNode>();
 
+            // addNodeOnly true means we just add the node to Children node list. Don't clear the list.
             if (!addNodeOnly)
             {
                 //clear the child node list, get ready to get the refreshed ones
@@ -275,7 +344,8 @@ namespace Microsoft.PowerShell.SHiPS
             SHiPSParameters parameters,
             string script,
             EventHandler<DataAddedEventArgs> outputAction,
-            EventHandler<DataAddedEventArgs> errorAction)
+            EventHandler<DataAddedEventArgs> errorAction,
+            params string[] args)
         {
             if (node == null)
             {
@@ -309,8 +379,15 @@ namespace Microsoft.PowerShell.SHiPS
                 //make script block             
                 powerShell.AddScript(script);
                 powerShell.AddParameter("object", node);
-                
-                
+
+                if (args != null && args.Any())
+                {
+                    for (int i = 0; i < args.Length; i++)
+                    {
+                        powerShell.AddParameter(("p" + i), args[i]);
+                    }
+                }
+
                 if (parameters != null)
                 {
                     if (parameters.Debug)

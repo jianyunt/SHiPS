@@ -1526,27 +1526,31 @@ namespace CodeOwls.PowerShell.Provider
 
         }
 
-        private IContentWriter DoGetContentWriter(string path1)
+        private IContentWriter DoGetContentWriter(string path)
         {
-            // For a case like set-content .\foo\bar\baz.ps1 where baz.ps1 may not be exist, so skip path check here.
-            var path =Path.GetDirectoryName(path1);
-            var leaf = Path.GetFileName(path1);
             var factories = GetNodeFactoryFromPath(path);
             var pathNodes = factories as IPathNode[] ?? factories.ToArray();
             if (!pathNodes.Any())
             {
-                WriteError(
-                    new ErrorRecord(
-                        new ItemNotFoundException(path),
-                        GetContentTargetDoesNotExistErrorID,
-                        ErrorCategory.ObjectNotFound,
-                        path
+                // For a case like Set-Content .\foo\bar\baz.ps1 where baz.ps1 possibly does not exist, so try its parent node.
+                var dir = Path.GetDirectoryName(path);
+                factories = GetNodeFactoryFromPath(dir);
+                pathNodes = factories as IPathNode[] ?? factories.ToArray();
+                if (!pathNodes.Any())
+                {
+                    WriteError(
+                        new ErrorRecord(
+                            new ItemNotFoundException(path),
+                            GetContentTargetDoesNotExistErrorID,
+                            ErrorCategory.ObjectNotFound,
+                            path
                         )
                     );
-                return null;
+                    return null;
+                }
             }
 
-            return GetContentWriter(leaf, pathNodes.FirstOrDefault(a => a is ISetItemContent));
+            return GetContentWriter(path, pathNodes.FirstOrDefault(a => a is ISetItemContent));
         }
 
         private IContentWriter GetContentWriter(string path, IPathNode pathNode)

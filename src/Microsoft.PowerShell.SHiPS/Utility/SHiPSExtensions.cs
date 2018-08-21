@@ -466,7 +466,7 @@ namespace Microsoft.PowerShell.SHiPS
 
             if (input is SHiPSLeaf)
             {
-                return new LeafNodeService(input, drive);
+                return new LeafNodeService(input, drive, parent);
             }
 
             // get or create a psobject on input
@@ -480,7 +480,7 @@ namespace Microsoft.PowerShell.SHiPS
 
             if (psobject.ImmediateBaseObject is SHiPSLeaf)
             {
-                return new LeafNodeService(psobject.ImmediateBaseObject, drive);
+                return new LeafNodeService(psobject.ImmediateBaseObject, drive, parent);
             }
                 
             return new PSObjectNodeService(psobject);

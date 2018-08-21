@@ -11,16 +11,22 @@ namespace Microsoft.PowerShell.SHiPS
     /// <summary>
     /// Defines actions that applies to a SHiPSLeaf node.
     /// </summary>
-    internal class LeafNodeService : PathNodeBase, IGetItemContent, IClearItemContent, IInvokeItem
+    internal class LeafNodeService : PathNodeBase,
+        IGetItemContent,
+        ISetItemContent,
+        IClearItemContent
     {
         private readonly SHiPSLeaf _shipsLeaf;
         private static readonly string _leaf = ".";
         private readonly SHiPSDrive _drive;
+        private readonly ContentHelper _contentHelper;
 
-        internal LeafNodeService(object leafObject, SHiPSDrive drive)
+        internal LeafNodeService(object leafObject, SHiPSDrive drive, SHiPSDirectory parent)
         {
             _shipsLeaf = leafObject as SHiPSLeaf;
             _drive = drive;
+            _contentHelper = new ContentHelper(_shipsLeaf, drive);
+            if (_shipsLeaf != null) { _shipsLeaf.Parent = parent; }
         }
 
         public override IPathValue GetNodeValue()
@@ -42,56 +48,44 @@ namespace Microsoft.PowerShell.SHiPS
 
         public IContentReader GetContentReader(IProviderContext context)
         {
-            // Calling GetContent()
-            var script = Constants.ScriptBlockWithParam1.StringFormat(Constants.GetContent);
-            var results = PSScriptRunner.InvokeScriptBlock(_shipsLeaf, _drive, script);
-
-            // Expected a collection of strings returned from GetContent() and save it to a stream
-            var stream = new ContentReaderWriter(results, AccessMode.Get, context, _drive, _shipsLeaf);
-            return stream;
+            return _contentHelper.GetContentReader(context);
         }
 
         public object GetContentReaderDynamicParameters(IProviderContext context)
         {
-            return null;
+            return _contentHelper.GetContentReaderDynamicParameters(context);
+            ;
+        }
+
+        #endregion
+
+        #region ISetItemContent
+
+        public IContentWriter GetContentWriter(IProviderContext context)
+        {
+            return _contentHelper.GetContentWriter(context);
+        }
+
+        public object GetContentWriterDynamicParameters(IProviderContext context)
+        {
+            return _contentHelper.GetContentWriterDynamicParameters(context);
         }
 
         #endregion
 
         #region IClearItemContent
 
-        public void ClearContent(IProviderContext providerContext)
+        public void ClearContent(IProviderContext context)
         {
             // Define ClearContent for now as the PowerShell engine calls ClearContent first for Set-Content cmdlet.
-            return;
+            _contentHelper.ClearContent(context);
         }
 
-        public object ClearContentDynamicParameters(IProviderContext providerContext)
+        public object ClearContentDynamicParameters(IProviderContext context)
         {
-            return null;
+            return _contentHelper.ClearContentDynamicParameters(context);
         }
 
         #endregion
-
-        public object InvokeItemParameters
-        {
-            get
-            {
-                var script = Constants.ScriptBlockWithParam1.StringFormat(Constants.InvokeItemDynamicParameters);
-                var parameters = PSScriptRunner.InvokeScriptBlock(_shipsLeaf, _drive, script);
-                return parameters?.FirstOrDefault(); ;
-            } 
-        }
-        public IEnumerable<object> InvokeItem(IProviderContext context, string path)
-        {
-            // Set the DynamicParameters before calling InvokeItem method written in PS script
-            _shipsLeaf.SHiPSProviderContext.DynamicParameters = context.DynamicParameters;
-
-            // Calling SHiPS based PowerShell provider 'void InvokeItem([string]$path)'
-            var script = Constants.ScriptBlockWithParams2.StringFormat(Constants.InvokeItem, path);
-            PSScriptRunner.InvokeScriptBlock(_shipsLeaf, _drive, script);
-
-            return null;
-        }
     }
 }

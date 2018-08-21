@@ -12,17 +12,22 @@ namespace Microsoft.PowerShell.SHiPS
     /// <summary>
     /// Defines actions that applies to a ContainerNode.
     /// </summary>
-    internal class ContainerNodeService : PathNodeBase, ISetItemContent, IClearItemContent
+    internal class ContainerNodeService : PathNodeBase,
+        ISetItemContent,
+        IClearItemContent
     {
         private readonly SHiPSDrive _drive;
         private readonly SHiPSDirectory _container;
         private static readonly string _directory = "+";
+        private readonly ContentHelper _contentHelper;
 
         internal ContainerNodeService(SHiPSDrive drive, object container, SHiPSDirectory parent)
         {
             _drive = drive;
             _container = container as SHiPSDirectory;
             if (_container != null) { _container.Parent = parent; }
+            _contentHelper = new ContentHelper(_container, drive);
+
         }
 
         internal SHiPSDirectory ContainerNode
@@ -158,35 +163,27 @@ namespace Microsoft.PowerShell.SHiPS
 
         public IContentWriter GetContentWriter(IProviderContext context)
         {
-            var item = this.ContainerNode;
-            if (item == null)
-            {
-                return null;
-            }
-
-            var stream = new ContentReaderWriter(null, AccessMode.Set, context, _drive, item);
-            return stream;
+            return _contentHelper.GetContentWriter(context);
         }
 
         public object GetContentWriterDynamicParameters(IProviderContext context)
         {
-            return null;
+            return _contentHelper.GetContentWriterDynamicParameters(context);
         }
 
         #endregion
 
         #region IClearItemContent
 
-
-        public void ClearContent(IProviderContext providerContext)
+        public void ClearContent(IProviderContext context)
         {
             // Define ClearContent for now as the PowerShell engine calls ClearContent first for Set-Content cmdlet.
-            return;
+            _contentHelper.ClearContent(context);
         }
 
-        public object ClearContentDynamicParameters(IProviderContext providerContext)
+        public object ClearContentDynamicParameters(IProviderContext context)
         {
-            return null;
+            return _contentHelper.ClearContentDynamicParameters(context);
         }
 
         #endregion
