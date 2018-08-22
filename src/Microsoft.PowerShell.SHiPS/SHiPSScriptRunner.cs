@@ -2,6 +2,7 @@
 using System.Management.Automation;
 using System;
 using System.Collections.Concurrent;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -147,37 +148,6 @@ namespace Microsoft.PowerShell.SHiPS
         }
 
         /// <summary>
-        /// Invokes an script block and return a collection of the objects.
-        /// </summary>
-        /// <param name="node"></param>
-        /// <param name="drive"></param>
-        /// <param name="script"></param>
-        /// <returns></returns>
-        internal static ICollection<object> InvokeScriptBlock(
-            SHiPSBase node,
-            SHiPSDrive drive,
-            string script)
-        {
-            return InvokeScriptBlock(null, node, drive, script, ReportErrors);
-        }
-
-        /// <summary>
-        /// Invokes an script block and return a collection of the objects.
-        /// </summary>
-        /// <param name="node"></param>
-        /// <param name="drive"></param>
-        /// <param name="script"></param>
-        /// <param name="args">Arguments passed into the script block.</param>
-        /// <returns></returns>
-        internal static ICollection<object> InvokeScriptBlock(
-            SHiPSBase node,
-            SHiPSDrive drive,
-            string script,
-            params string[] args)
-        {
-            return InvokeScriptBlock(null, node, drive, script, ReportErrors, args);
-        }
-        /// <summary>
         /// Invokes a script block and updates the parent's children node list in the cached case.
         /// </summary>
         /// <param name="context">A ProviderContext object contains information that a PowerShell provider needs.</param>
@@ -198,20 +168,33 @@ namespace Microsoft.PowerShell.SHiPS
             try
             {
                 var errors = new ConcurrentBag<ErrorRecord>();
+                var parameters = context?.GetSHiPSParameters();
 
                 var results = CallPowerShellScript(
                     node,
                     drive.PowerShellInstance,
-                    null,
+                    parameters,
                     script,
                     output_DataAdded,
                     (sender, e) => error_DataAdded(sender, e, errors),
                     args);
 
-                if (errors.Any())
+
+                if (errors.WhereNotNull().Any())
                 {
-                    // report the error if there are any
-                    errorHandler?.Invoke(node.Name, context, errors);
+                    if (context != null)
+                    {
+                        // report the error if there are any
+                        errorHandler?.Invoke(node.Name, context, errors);
+                    }
+                    else
+                    {
+                        // report the error if there are any
+                        var error = errors.FirstOrDefault();
+                        var message = Environment.NewLine;
+                        message += error.ErrorDetails == null ? error.Exception.Message : error.ErrorDetails.Message;
+                        throw new InvalidDataException(message);
+                    }
                 }
 
                 if (results == null || !results.Any())
@@ -219,7 +202,7 @@ namespace Microsoft.PowerShell.SHiPS
                     return null;
                 }
 
-                if(context!= null && node.UseCache)
+                if(context != null && node.UseCache)
                 {
                     if (node.IsLeaf)
                     {

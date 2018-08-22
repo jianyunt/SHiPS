@@ -25,7 +25,7 @@ namespace Microsoft.PowerShell.SHiPS
         {
             // Calling GetContent()
             var script = Constants.ScriptBlockWithParam1.StringFormat(Constants.GetContent);
-            var results = PSScriptRunner.InvokeScriptBlock(_node, _drive, script);
+            var results = PSScriptRunner.InvokeScriptBlock(context, _node, _drive, script, PSScriptRunner.ReportErrors);
 
             // Expected a collection of strings returned from GetContent() and save it to a stream
             var stream = new ContentReader(results, context);

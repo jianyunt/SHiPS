@@ -81,7 +81,7 @@ namespace Microsoft.PowerShell.SHiPS
         private  object GetNodeChildrenDynamicParameters(SHiPSDirectory node)
         {
             var script = Constants.ScriptBlockWithParam1.StringFormat(Constants.GetChildItemDynamicParameters);
-            var parameters = PSScriptRunner.InvokeScriptBlock(node, _drive, script);
+            var parameters = PSScriptRunner.InvokeScriptBlock(null, node, _drive, script, PSScriptRunner.ReportErrors);
             return parameters?.FirstOrDefault();   
         }
 
