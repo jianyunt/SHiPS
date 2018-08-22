@@ -158,7 +158,7 @@ namespace Microsoft.PowerShell.SHiPS
             SHiPSDrive drive,
             string script)
         {
-            return InvokeScriptBlock(null, node, drive, script);
+            return InvokeScriptBlock(null, node, drive, script, ReportErrors);
         }
 
         /// <summary>
@@ -175,7 +175,7 @@ namespace Microsoft.PowerShell.SHiPS
             string script,
             params string[] args)
         {
-            return InvokeScriptBlock(null, node, drive, script, args);
+            return InvokeScriptBlock(null, node, drive, script, ReportErrors, args);
         }
         /// <summary>
         /// Invokes a script block and updates the parent's children node list in the cached case.
@@ -184,6 +184,7 @@ namespace Microsoft.PowerShell.SHiPS
         /// <param name="node">Node object that is corresponding to the current path.</param>
         /// <param name="drive">Current drive that a user is in use.</param>
         /// <param name="script">PowerShell script to be run.</param>
+        /// <param name="errorHandler">Action for handling error cases.</param>
         /// <param name="args">Arguments passed into the script block.</param>
         /// <returns></returns>
         internal static ICollection<object> InvokeScriptBlock(
@@ -191,6 +192,7 @@ namespace Microsoft.PowerShell.SHiPS
            SHiPSBase node,
            SHiPSDrive drive,
            string script,
+           Action<string, IProviderContext, IEnumerable<ErrorRecord>> errorHandler,
            params string[] args)
         {
             try
@@ -206,14 +208,10 @@ namespace Microsoft.PowerShell.SHiPS
                     (sender, e) => error_DataAdded(sender, e, errors),
                     args);
 
-                if (errors.WhereNotNull().Any())
+                if (errors.Any())
                 {
-                    var error = errors.FirstOrDefault();
-                    if (error == null) { return null; }
-
-                    var message = Environment.NewLine;
-                    message += error.ErrorDetails == null ? error.Exception.Message : error.ErrorDetails.Message;
-                    drive.SHiPS.WriteWarning(message);
+                    // report the error if there are any
+                    errorHandler?.Invoke(node.Name, context, errors);
                 }
 
                 if (results == null || !results.Any())

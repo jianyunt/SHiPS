@@ -67,7 +67,7 @@ namespace Microsoft.PowerShell.SHiPS
                     // Invoke SetContent and pass in content and path to the script
                     // Calling SHiPS based PowerShell provider '[object] SetContent([string]$content, [string]$path)'
                     var script = Constants.ScriptBlockWithParam3.StringFormat(Constants.SetContent);
-                    PSScriptRunner.InvokeScriptBlock(_context, _node, _drive, script, content, _context.Path);
+                    PSScriptRunner.InvokeScriptBlock(_context, _node, _drive, script, PSScriptRunner.SetContentNotSupported, content, _context.Path);
                 }
             }
             finally
