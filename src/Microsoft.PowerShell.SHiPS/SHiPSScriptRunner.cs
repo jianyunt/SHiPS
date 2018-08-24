@@ -446,21 +446,23 @@ namespace Microsoft.PowerShell.SHiPS
 
         internal static void SetContentNotSupported(string item, IProviderContext context, IEnumerable<ErrorRecord> errors)
         {
-            var exception = new NodeDoesNotSupportCmdletException(context.Path, Constants.SetContent);
-            var errorRecord = new ErrorRecord(exception, ErrorId.SetContentNotSupportedErrorId, ErrorCategory.NotImplemented, context.Path);
-            context.WriteError(errorRecord);
+            var message = Resource.UnSupportedCmdlet.StringFormat(context.Path, Constants.SetContent);
 
             foreach (var error in errors)
             {
                 var msg = error.ErrorDetails == null ? error.Exception.Message : error.ErrorDetails.Message;
-                context.ReportError(error.FullyQualifiedErrorId, msg, error.CategoryInfo.Category, "SHiPS");
+                message += Environment.NewLine + "More details: " + msg;
 
                 if (!string.IsNullOrWhiteSpace(error.Exception.StackTrace))
                 {
                     // give a debug hint if we have a script stack trace for more info
+
                     context.WriteDebug(error.Exception.StackTrace);
                 }
             }
+
+            context.ReportError(ErrorId.SetContentNotSupportedErrorId, message, ErrorCategory.NotImplemented, context.Path);
+
         }
     }
 }

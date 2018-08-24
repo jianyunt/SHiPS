@@ -1597,13 +1597,7 @@ namespace CodeOwls.PowerShell.Provider
         private void DoClearContent(string path)
         {
             var clear = GetFirstNodeFactoryFromPath(path) as IClearItemContent;
-            if (null == clear)
-            {
-                WriteCmdletNotSupportedAtNodeError(path, ProviderCmdlet.ClearContent, ClearContentNotSupportedErrorId);
-                return;
-            }
-
-            clear.ClearContent(CreateContext(path));
+            clear?.ClearContent(CreateContext(path));
         }
 
         public object ClearContentDynamicParameters(string path)
